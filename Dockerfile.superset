@@ -1,0 +1,11 @@
+FROM superset/superset
+
+USER root
+
+# Install dependencies
+RUN /app/.venv/bin/pip -m ensurepip
+
+#install PostgreSQL driver into the superset virtual environment
+RUN /app/.venv/bin/python -m pip pip install psycopg2-binary
+
+USER superset
