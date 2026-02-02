@@ -1,0 +1,10 @@
+requests
+deltalake
+boto3
+pyarrow
+fastparquet
+python-dateutil
+python-dotenv
+minio
+pyspark
+delta-spark

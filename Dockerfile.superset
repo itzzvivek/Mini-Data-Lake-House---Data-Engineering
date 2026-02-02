@@ -1,4 +1,4 @@
-FROM superset/superset
+FROM superset/superset:latest
 
 USER root
 
