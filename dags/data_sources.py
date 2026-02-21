@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 import os
 import requests
+import json
 from dotenv import load_dotenv
 from urllib.parse import unquote
 from minio import Minio
@@ -27,36 +28,65 @@ BUCKET_NAME="mini-datalake"
 RAW_FOLDER="raw-data"
 PORCESSED_FOLDER="processed-data"
 
+today = datetime.utcnow().strftime("%Y-%m-%d")
 
-with DAG(
-    dag_id="data_sources_dag",
-    description="DAG to fetch data from external sources and store in MinIO",
-    start_date=datetime(2024, 1, 1),
-    schedule='@daily',
-    catchup=False,
-    tags=['data_sources'],
-) as dag:
-    
-    def fetch_and_store_data():
-        ensure_bucket_exists(BUCKET_NAME)
-        data_source_url = "https://jsonplaceholder.typicode.com/posts"
-        response = requests.get(data_source_url)
-        if response.status_code == 200:
-            data = response.json()
-            object_name = f"{RAW_FOLDER}/posts_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
-            minio_client.put_object(
-                bucket_name=BUCKET_NAME,
-                object_name=object_name,
-                data=str(data).encode('utf-8'),
-                length=len(str(data).encode('utf-8'))
-            )
-            print(f"Data stored in MinIO at {object_name}")
-        else:
-            print(f"Failed to fetch data. Status code: {response.status_code}")
+##=== minio write function ===##
+def upload_to_minio(source_name, data):
+    file_path = f"/tmp/{source_name}_{today}.json"
 
-    fetch_and_store_task = PythonOperator(
-        task_id="fetch_and_store_data",
-        python_callable=fetch_and_store_data
+    with open(file_path, "w") as f:
+        json.dump(data, f)
+
+    ensure_bucket_exists(BUCKET_NAME)
+
+    minio_client.fput_object(
+        BUCKET_NAME,
+        f"{RAW_FOLDER}/{source_name}/{today}.json",
+        file_path
     )
 
-    fetch_and_store_task
+    os.remove(file_path)
+
+# get raw data from apis
+
+CITIES = {
+        "Delhi": {"lat": 28.7041, "lon": 77.1025},
+        "London": {"lat": 51.5074, "lon": -0.1278},
+        "New York": {"lat": 40.7128, "lon": -74.0060},
+        "Tokyo": {"lat": 35.6895, "lon": 139.6917},
+        "Sydney": {"lat": -33.8688, "lon": 151.2093}
+    }
+
+def fetch_weather(city, lat, lon):
+    url = ( f"https://api.openmeteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=temperature_2m,precipitation_sum&current_weather=true&timezone=auto" )
+    response = requests.get(url)
+    upload_to_minio(f"weather_{city}", response.json())
+
+def fetch_news():
+    NEWS_API_KEY = os.getenv("NEWSAPI_KEY")
+    url = f" https://newsdata.io/api/1/latest?apikey={NEWS_API_KEY}&q=all"
+    response = requests.get(url)
+    upload_to_minio("news", response.json())
+
+def fetch_crypto():
+    CRYPTO_API_KEY = os.getenv("COINGECKO_API")
+    headers = {"X-CoinAPI-Key": CRYPTO_API_KEY, "Accept": "application/json"}
+    url = "https://api.coingecko.com/api/v3/coins/markets"
+    params = {
+        "vs_currency": "usd",
+        "order": "market_cap_desc",
+        "per_page": 10,
+        "page": 1
+    }
+    response = requests.get(url,headers=headers, params=params)
+    upload_to_minio("crypto", response.json())
+
+def fetch_countries():
+    url = "https://restcountries.com/v3.1/all"
+    response = requests.get(url)
+    upload_to_minio("countries", response.json())
+
+
+#=== DAG Definition ===##
+
+    
