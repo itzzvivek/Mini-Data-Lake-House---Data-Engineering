@@ -89,4 +89,43 @@ def fetch_countries():
 
 #=== DAG Definition ===##
 
+default_args = {
+    'owner': 'vivek',
+    'retries': 1,
+    'retry_delay': timedelta(minutes=5),
+}
+
+with DAG(
+    dag_id='data_sources_dag',
+    default_args=default_args,
+    description='DAG to fetch data from various APIs and store in MinIO',
+    schedule_interval="@daily",
+    start_date=datetime(2024, 1, 1),
+    catchup=False,
+    tags=['data_sources', 'minio']
+) as dags:
     
+    weather_tasks = PythonOperator(
+        task_id=f'fetch_weather',
+        python_callable = fetch_weather
+    )
+
+    news_task = PythonOperator(
+        task_id='fetch_news',
+        python_callable=fetch_news
+    )
+
+    crypto_task = PythonOperator(
+        task_id='fetch_crypto',
+        python_callable=fetch_crypto
+    )
+
+    countries_task = PythonOperator(
+        task_id='fetch_countries',
+        python_callable=fetch_countries
+    )
+
+
+    # Run in parallel
+
+    [weather_tasks,news_task, crypto_task, countries_task]
