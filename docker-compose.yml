@@ -1,6 +1,16 @@
 version: "3.9"
 
 services:
+  postgres:
+    image: postgres:13
+    container_name: postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    networks:
+      - lakehouse_net
+
   minio:
     image: minio/minio:latest
     container_name: minio
@@ -36,20 +46,23 @@ services:
     container_name: airflow
     user: "50000:0"
     depends_on:
+      - postgres
       - minio
       - spark
     environment:
-      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__SECRET_KEY: "secret_key_for_session"
     ports:
-      - "8080:8080"
+      - "8085:8080"
     volumes:
       - airflow_dags:/opt/airflow/dags
       - airflow_logs:/opt/airflow/logs
       - airflow_plugins:/opt/airflow/plugins
     command: >
       bash -c "
+      rm -f /opt/airflow/airflow-webserver.pid &&
       airflow db init &&
       airflow users create
         --username admin
@@ -58,52 +71,15 @@ services:
         --lastname User
         --role Admin
         --email admin@example.com || true &&
-      airflow webserver & airflow scheduler"
+      (airflow webserver & airflow scheduler & wait)"
     networks:
       - lakehouse_net
-
-
-  # duckdb:
-  #   image: python:3.10-slim
-  #   container_name: duckdb
-  #   volumes:
-  #     - ./duckdb:/app
-  #   working_dir: /app
-  #   command: tail -f /dev/null
-  #   networks:
-  #     - lakehouse_net
-
-  # superset:
-  #   image: apache/superset:latest
-  #   container_name: superset
-  #   depends_on:
-  #     - duckdb
-  #   ports:
-  #     - "8089:8088"
-  #   environment:
-  #     SUPERSET_SECRET_KEY: supersecretkey
-  #   volumes:
-  #     - superset_home:/app/superset_home
-  #   command: >
-  #     bash -c "
-  #     superset db upgrade &&
-  #     superset fab create-admin
-  #       --username admin
-  #       --firstname Admin
-  #       --lastname User
-  #       --email admin@example.com
-  #       --password admin &&
-  #     superset init &&
-  #     superset run -h 0.0.0.0 -p 8088"
-  #   networks:
-  #     - lakehouse_net
 
 volumes:
   minio_data:
   airflow_dags:
   airflow_logs:
   airflow_plugins:
-  # superset_home:
 
 networks:
   lakehouse_net:
