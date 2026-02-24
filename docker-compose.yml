@@ -1,16 +1,6 @@
 version: "3.9"
 
 services:
-  postgres:
-    image: postgres:13
-    container_name: postgres
-    environment:
-      - POSTGRES_USER=airflow
-      - POSTGRES_PASSWORD=airflow
-      - POSTGRES_DB=airflow
-    networks:
-      - lakehouse_net
-
   minio:
     image: minio/minio:latest
     container_name: minio
@@ -22,65 +12,71 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - minio_data:/data
-    networks:
-      - lakehouse_net
+      - ./data:/data
+    restart: unless-stopped
+    
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
 
   spark:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
     container_name: spark
     environment:
       - SPARK_MODE=master
     ports:
-      - "8088:8080"
       - "7077:7077"
+      - "8080:8080"
     volumes:
-      - ./spark:/opt/spark-apps
-    networks:
-      - lakehouse_net
+      - ./spark_jobs:/spark_jobs
+    restart: unless-stopped
 
   airflow:
     image: apache/airflow:2.8.1
     container_name: airflow
-    user: "50000:0"
     depends_on:
-      - postgres
       - minio
-      - spark
     environment:
-      AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
-      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
-      AIRFLOW__WEBSERVER__SECRET_KEY: "secret_key_for_session"
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
     ports:
-      - "8085:8080"
+      - "8088:8080"
     volumes:
-      - airflow_dags:/opt/airflow/dags
-      - airflow_logs:/opt/airflow/logs
-      - airflow_plugins:/opt/airflow/plugins
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./airflow/plugins:/opt/airflow/plugins
+      - ./scripts:/opt/airflow/scripts
     command: >
       bash -c "
-      rm -f /opt/airflow/airflow-webserver.pid &&
       airflow db init &&
-      airflow users create
-        --username admin
-        --password admin
-        --firstname Admin
-        --lastname User
-        --role Admin
-        --email admin@example.com || true &&
-      (airflow webserver & airflow scheduler & wait)"
-    networks:
-      - lakehouse_net
+      airflow users create 
+      --username admin 
+      --firstname Admin 
+      --lastname User 
+      --role Admin 
+      --email admin@example.com 
+      --password admin &&
+      airflow webserver & airflow scheduler
+      "
+    restart: unless-stopped
 
-volumes:
-  minio_data:
-  airflow_dags:
-  airflow_logs:
-  airflow_plugins:
-
-networks:
-  lakehouse_net:
-    driver: bridge
+  # superset:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.superset
+  #   container_name: superset
+  #   ports:
+  #     - "8089:8088"
+  #   depends_on:
+  #     - airflow
+  #   restart: unless-stopped
