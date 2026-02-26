@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from urllib.parse import unquote
 from minio import Minio
 from minio.credentials import StaticProvider
-from config.minio_client import minio_client, ensure_bucket_exists
+from ../config.minio_client import minio_client, ensure_bucket_exists
 
 load_dotenv()
 
