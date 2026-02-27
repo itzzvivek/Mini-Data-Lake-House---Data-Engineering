@@ -9,11 +9,11 @@ from dotenv import load_dotenv
 from urllib.parse import unquote
 from minio import Minio
 from minio.credentials import StaticProvider
-from ../config.minio_client import minio_client, ensure_bucket_exists
+from plugins.minio_client import minio_client, ensure_bucket_exists
 
 load_dotenv()
 
-MINIO_PORT=os.getenv("MINIO_PORT")
+MINIO_PORT=Minio("minio:9000", secure=False)
 MINIO_ROOT_USER=os.getenv("MINIO_ROOT_USER")
 MINIO_ROOT_PASSWORD=os.getenv("MINIO_ROOT_PASSWORD")
 MINIO_BUCKET_NAME=os.getenv("MINIO_BUCKET_NAME")
