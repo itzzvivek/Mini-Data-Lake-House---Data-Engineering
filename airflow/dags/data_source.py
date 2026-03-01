@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from urllib.parse import unquote
 from minio import Minio
 from minio.credentials import StaticProvider
-from plugins.minio_client import minio_client, ensure_bucket_exists
+from utils.minio_client import ensure_bucket_exists
 
 load_dotenv()
 
@@ -18,11 +18,11 @@ MINIO_ROOT_USER=os.getenv("MINIO_ROOT_USER")
 MINIO_ROOT_PASSWORD=os.getenv("MINIO_ROOT_PASSWORD")
 MINIO_BUCKET_NAME=os.getenv("MINIO_BUCKET_NAME")
 
-minio_client = Minio(
-    MINIO_PORT.replace("http://", "").replace("https://", ""),
-    credentials=StaticProvider(MINIO_ROOT_USER,MINIO_ROOT_PASSWORD),
-    secure=False
-)
+# minio_urls = Minio(
+#     MINIO_PORT.replace("http://", "").replace("https://", ""),
+#     credentials=StaticProvider(MINIO_ROOT_USER,MINIO_ROOT_PASSWORD),
+#     secure=False
+# )
 
 BUCKET_NAME="mini-datalake"
 RAW_FOLDER="raw-data"
@@ -39,7 +39,7 @@ def upload_to_minio(source_name, data):
 
     ensure_bucket_exists(BUCKET_NAME)
 
-    minio_client.fput_object(
+    minio_urls.fput_object(
         BUCKET_NAME,
         f"{RAW_FOLDER}/{source_name}/{today}.json",
         file_path
