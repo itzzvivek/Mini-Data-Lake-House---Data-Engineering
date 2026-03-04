@@ -6,8 +6,8 @@ load_dotenv()
 
 MINIO_HOST = os.getenv("MINIO_HOST", "minio")
 MINIO_PORT = os.getenv("MINIO_PORT", "9000")
-MINIO_ROOT_USER = os.getenv("MINIO_ROOT_USER")
-MINIO_ROOT_PASSWORD = os.getenv("MINIO_ROOT_PASSWORD")
+MINIO_ROOT_USER = os.getenv("MINIO_ROOT_USER", "minioadmin")
+MINIO_ROOT_PASSWORD = os.getenv("MINIO_ROOT_PASSWORD", "minioadmin")
 MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME", "minidatalake")
 
 minio_bucket = Minio(

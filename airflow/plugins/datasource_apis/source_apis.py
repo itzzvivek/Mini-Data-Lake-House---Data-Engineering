@@ -20,7 +20,7 @@ def fetch_all_weather():
             f"&current_weather=true&timezone=auto"
         )
         response = requests.get(url)
-        upload_to_minio(f"weather_{city}", response.json())
+        upload_to_minio(f"Weathers/weather_{city}", response.json())
         print(f"Fetched weather data for {city}: {response.status_code}")
 
 def fetch_news():
