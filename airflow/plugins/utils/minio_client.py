@@ -1,4 +1,5 @@
 import os
+import json
 from minio import Minio
 from dotenv import load_dotenv
 
@@ -27,18 +28,20 @@ def ensure_bucket_exists(bucket_name):
         print(f"Bucket '{bucket_name}' already exists.")
 
 def upload_to_minio(source_name, data):
-    import json
-    file_path = f"/tmp/{source_name}_{today}.json"
+    safe_name = source_name.replace("/", "_")
+    file_path = f"/tmp/{safe_name}_{today}.json"
     with open(file_path, "w") as f:
         json.dump(data, f)
+
     ensure_bucket_exists(MINIO_BUCKET_NAME)
+
     minio_bucket.fput_object(
         MINIO_BUCKET_NAME,
         f"{RAW_FOLDER}/{source_name}/{today}.json",
         file_path
     )
-    import os; os.remove(file_path)
-    print(f"✅ Uploaded {source_name} to MinIO")
+    os.remove(file_path)
+    print(f"Uploaded {source_name} to MinIO at {RAW_FOLDER}/{source_name}/{today}.json")
 
 def verify_minio_load():
     print(f"🔍 Verifying uploads for {today}...")
@@ -47,5 +50,5 @@ def verify_minio_load():
     if not uploaded:
         raise ValueError(f"❌ No files found in MinIO for {today}!")
     for f in uploaded:
-        print(f"  ✅ {f}")
-    print(f"\n✅ {len(uploaded)} file(s) loaded successfully.")
+        print(f"{f}")
+    print(f"\n {len(uploaded)} file(s) loaded successfully.")
