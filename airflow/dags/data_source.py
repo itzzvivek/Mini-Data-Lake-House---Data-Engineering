@@ -1,9 +1,20 @@
+import os
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime, timedelta
 from utils.minio_client import verify_minio_load
+from airflow.providers.docker.operators.docker import DockerOperator 
 from datasource_apis.source_apis import fetch_all_weather, fetch_news, fetch_crypto, fetch_countries
 
+
+#MINIO Config
+MINIO_HOST = f"{os.getenv('MINIO_HOST', 'minio')}:{os.getenv('MINIO_PORT', '9000')}"
+MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY', 'minioadmin')
+MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', 'minioadmin')
+MINIO_BUCKET = os.getenv('MINIO_BUCKET', 'minidatalake')
+
+def spark_command(job_script):
+    return f"spark-submit --master local[*] --packages org.apache.hadoop:hadoop-aws:3.3.1 /opt/airflow/spark_jobs/{job_script}"
 
 default_args = {
     'owner': 'vivek',
@@ -46,4 +57,68 @@ with DAG(
         python_callable=verify_minio_load
     )
 
+
+    # Shared env vars for all spark containers -mathes session.py os.getenv() keys
+
+    spark_env = {
+        "SE_ENDPOINT": f"http://{os.getenv('MINIO_HOST', 'minio')}:{os.getenv('MINIO_PORT', '9000')}",
+        "SE_ACCESS_KEY": os.getenv("MINIO_ROOT_USER", "minioadmin"),
+        "SE_SECRET_KEY": os.getenv("MINIO_ROOT_PASSWORD", "minioadmin"),
+    }
+
+    ## == TRANSFORMATION TASKS (DOCKEROperator) == ##
+    transform_weather_task = DockerOperator(
+        task_id="transform_weather",
+        image = "spark-app:latest",
+        container_name = "spark_transform_weather",
+        api_verion="auto",
+        auto_remove=True,
+        command=spark_command("transform_weather.py"),
+        docker_url="unix://var/run/docker.sock",
+        network_mode="bridge",
+        environment=spark_env
+    )
+
+    transform_news_task = DockerOperator(
+        task_id="transform_news",
+        image = "spark-app:latest",
+        container_name = "spark_transform_news",
+        api_verion="auto",
+        auto_remove=True,
+        command=spark_command("transform_news.py"),
+        docker_url="unix://var/run/docker.sock",
+        network_mode="bridge",
+        environment=spark_env,
+    )
+
+    transform_crypto_task = DockerOperator(
+        task_id="transform_crypto",
+        image = "spark-app:latest",
+        container_name = "spark_transform_crypto",
+        api_verion="auto",
+        auto_remove=True,
+        command=spark_command("transform_crypto.py"),
+        docker_url="unix://var/run/docker.sock",
+        network_mode="bridge",
+        environment=spark_env,
+    )
+
+    transform_countries_task = DockerOperator(
+        task_id="transform_countries",
+        image = "spark-app:latest",
+        container_name = "spark_transform_countries",
+        api_verion="auto",
+        auto_remove=True,
+        command=spark_command("transform_countries.py"),
+        docker_url="unix://var/run/docker.sock",
+        network_mode="bridge",
+        environment=spark_env,
+    )
+
     [weather_task, news_task, crypto_task, countries_task] >> verify_load_task
+
+    verify_load_task >> [transform_weather_task, 
+                         transform_news_task, 
+                         transform_crypto_task, 
+                         transform_countries_task
+                        ]
