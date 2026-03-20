@@ -28,6 +28,6 @@ RUN curl -o /opt/spark/jars/hadoop-aws-3.3.4.jar \
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
-
+COPY spark_jobs/ /app/spark_jobs/
 # Let container stay alive (Airflow submits jobs)
 CMD ["tail", "-f", "/dev/null"]
